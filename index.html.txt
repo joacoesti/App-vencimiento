@@ -1,0 +1,199 @@
+!DOCTYPE html
+html lang=es
+head
+    meta charset=UTF-8
+    meta name=viewport content=width=device-width, initial-scale=1.0
+    titleVencePronto Protitle
+    !-- Librerías Escáner y Diseño --
+    script src=httpsunpkg.comscript
+    script src=httpstailwindcss.comscript
+    style
+        .category-card { transition all 0.2s; cursor pointer; }
+        .category-cardactive { transform scale(0.95); }
+        .selected-cat { border 3px solid #3b82f6; background-color #eff6ff; }
+        #video { width 100%; border-radius 1rem; background #000; transform scaleX(-1); }
+        .status-red { border-left 8px solid #ef4444; }
+        .status-yellow { border-left 8px solid #f59e0b; }
+    style
+head
+body class=bg-gray-100 min-h-screen pb-20
+
+    !-- Navegación Superior --
+    nav class=bg-blue-600 text-white p-4 sticky top-0 z-50 shadow-md
+        h1 class=text-xl font-bold text-center🍎 VencePronto Proh1
+    nav
+
+    !-- CONTENEDOR PRINCIPAL --
+    main class=p-4 max-w-md mx-auto
+        
+        !-- SECCIÓN ESCÁNER --
+        section id=view-scan class=space-y-4
+            div class=bg-white p-4 rounded-2xl shadow-sm
+                video id=videovideo
+                div class=mt-4 space-y-2
+                    p class=text-sm font-semibold text-gray-500CÓDIGO DETECTADOp
+                    input type=text id=barcode-input class=w-full p-3 bg-gray-100 rounded-lg text-lg font-bold placeholder=Escaneando...
+                div
+            div
+
+            div class=bg-white p-4 rounded-2xl shadow-sm space-y-4
+                input type=text id=product-name class=w-full p-3 border rounded-lg placeholder=Nombre del producto
+                
+                p class=text-sm font-semibold text-gray-600Categoría (sugiere fecha)p
+                div class=grid grid-cols-3 gap-2 id=categories-grid
+                    !-- Categorías se generan por JS --
+                div
+
+                div class=pt-2
+                    p class=text-sm font-semibold text-gray-600Fecha de Vencimientop
+                    input type=date id=expiry-date class=w-full p-3 border rounded-lg text-lg
+                div
+
+                button onclick=saveProduct() class=w-full bg-green-500 text-white font-bold py-4 rounded-xl shadow-lg hoverbg-green-600 transition
+                    GUARDAR PRODUCTO
+                button
+            div
+        section
+
+        !-- SECCIÓN LISTADO (DASHBOARD) --
+        section id=view-list class=hidden space-y-4
+            div class=flex justify-between items-center
+                h2 class=text-lg font-boldInventario Actualh2
+                button onclick=shareWhatsApp() class=text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold📢 Compartir Ofertasbutton
+            div
+            div id=inventory-list class=space-y-3
+                !-- Items de inventario --
+            div
+        section
+    main
+
+    !-- BARRA INFERIOR --
+    footer class=fixed bottom-0 w-full bg-white border-t flex justify-around p-3 shadow-2xl
+        button onclick=switchView('scan') class=flex flex-col items-center text-blue-600
+            span📷spanspan class=text-xsScannerspan
+        button
+        button onclick=switchView('list') class=flex flex-col items-center text-gray-400 id=nav-list
+            span📋spanspan class=text-xsListaspan
+        button
+    footer
+
+    script
+         CONFIGURACIÓN INICIAL
+        const categories = [
+            { n 'Lácteos', d 15, e '🥛' }, { n 'Panadería', d 5, e '🍞' }, { n 'Carnes', d 3, e '🥩' },
+            { n 'Frutas', d 4, e '🍎' }, { n 'Bebidas', d 30, e '🥤' }, { n 'Almacén', d 180, e '🥫' }
+        ];
+
+        let database = JSON.parse(localStorage.getItem('vp_db'))  [];
+        let memory = JSON.parse(localStorage.getItem('vp_memory'))  {};  Aquí vive el autocompletado
+
+         INICIALIZAR ESCÁNER
+        const codeReader = new ZXing.BrowserMultiFormatReader();
+        codeReader.decodeFromVideoDevice(null, 'video', (result, err) = {
+            if (result) {
+                const code = result.text;
+                document.getElementById('barcode-input').value = code;
+                
+                 --- AQUÍ ESTÁ EL ARREGLO DE LA MEMORIA ---
+                if (memory[code]) {
+                    document.getElementById('product-name').value = memory[code].name;
+                    selectCategory(memory[code].catIndex);
+                     Efecto visual de que encontró algo
+                    document.getElementById('product-name').classList.add('bg-green-50');
+                    setTimeout(() = document.getElementById('product-name').classList.remove('bg-green-50'), 500);
+                }
+            }
+        });
+
+         GENERAR GRILLA DE CATEGORÍAS
+        const grid = document.getElementById('categories-grid');
+        let selectedCatIndex = null;
+
+        categories.forEach((cat, index) = {
+            const div = document.createElement('div');
+            div.className = `category-card bg-gray-50 p-2 rounded-lg text-center border-2 border-transparent`;
+            div.id = `cat-${index}`;
+            div.innerHTML = `div class=text-xl${cat.e}divdiv class=text-[10px]${cat.n}div`;
+            div.onclick = () = selectCategory(index);
+            grid.appendChild(div);
+        });
+
+        function selectCategory(index) {
+            document.querySelectorAll('.category-card').forEach(el = el.classList.remove('selected-cat'));
+            document.getElementById(`cat-${index}`).classList.add('selected-cat');
+            selectedCatIndex = index;
+            
+             Sugerir fecha
+            const dateInput = document.getElementById('expiry-date');
+            const targetDate = new Date();
+            targetDate.setDate(targetDate.getDate() + categories[index].d);
+            dateInput.value = targetDate.toISOString().split('T')[0];
+        }
+
+        function saveProduct() {
+            const name = document.getElementById('product-name').value;
+            const code = document.getElementById('barcode-input').value;
+            const date = document.getElementById('expiry-date').value;
+
+            if (!name  !date  !code) return alert(Faltan datos);
+
+            const item = { name, code, date, catIndex selectedCatIndex };
+            database.push(item);
+            
+             Guardar en memoria para la próxima vez
+            memory[code] = { name, catIndex selectedCatIndex };
+            
+            localStorage.setItem('vp_db', JSON.stringify(database));
+            localStorage.setItem('vp_memory', JSON.stringify(memory));
+
+            alert(¡Guardado!);
+            location.reload();  Recargar para limpiar
+        }
+
+        function switchView(view) {
+            document.getElementById('view-scan').classList.toggle('hidden', view !== 'scan');
+            document.getElementById('view-list').classList.toggle('hidden', view !== 'list');
+            renderList();
+        }
+
+        function renderList() {
+            const container = document.getElementById('inventory-list');
+            container.innerHTML = ;
+            const hoy = new Date();
+
+            database.sort((a,b) = new Date(a.date) - new Date(b.date)).forEach(item = {
+                const vDate = new Date(item.date);
+                const diffDays = Math.ceil((vDate - hoy)  (1000  60  60  24));
+                
+                let statusClass = ;
+                if (diffDays = 2) statusClass = status-red;
+                else if (diffDays = 7) statusClass = status-yellow;
+
+                container.innerHTML += `
+                    div class=bg-white p-4 rounded-xl shadow-sm flex justify-between items-center ${statusClass}
+                        div
+                            div class=font-bold${item.name}div
+                            div class=text-xs text-gray-400${item.code}div
+                        div
+                        div class=text-right
+                            div class=text-sm font-bold ${diffDays = 2  'text-red-500'  'text-gray-600'}${diffDays} díasdiv
+                            div class=text-[10px] text-gray-400${item.date}div
+                        div
+                    div
+                `;
+            });
+        }
+
+        function shareWhatsApp() {
+            const urgentes = database.filter(item = {
+                const diff = (new Date(item.date) - new Date())  (1000606024);
+                return diff = 7;
+            });
+            
+            let msg = 🔥 ¡OFERTAS DE HOY! - Productos por vencernn;
+            urgentes.forEach(i = msg += `• ${i.name} (Vence pronto)n`);
+            window.open(`httpswa.me{encodeURIComponent(msg)}`);
+        }
+    script
+body
+html
